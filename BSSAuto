@@ -1,0 +1,240 @@
+--library by Boxking776#0001
+local library = loadstring(game:HttpGet("https://pastebin.com/raw/N7ACTspU", true))()--"https://raw.githubusercontent.com/StopReverseEngineeringMyScripts/WhatAreYouDoingHere/main/YummySource"
+
+local main = library:CreateWindow("Main")
+
+
+
+--autofarm scripts made by JoshieGemFinder#6861
+
+
+local pollen = false --autosell
+local tokens = false --autocollect tokens
+local dig = false --autodig
+local field = false --tp to highest field
+local autooff = false --deactivate when there's another player, so you dont get reported
+
+--auto convert stuff
+local player = game:GetService("Players").LocalPlayer
+
+local selling = false
+
+local function getPollen()
+    local pollenLabel = game.Players.LocalPlayer.Character:FindFirstChild("ProgressLabel",true)
+    return tonumber(pollenLabel.Text:match("%d-/"):sub(1, -2))
+end
+
+local function getMaxPollen()
+    local pollenLabel = game.Players.LocalPlayer.Character:FindFirstChild("ProgressLabel",true)
+    return tonumber(pollenLabel.Text:match("%d+$"))
+end
+
+local function sell()
+    local prevPos = player.Character.HumanoidRootPart.CFrame
+    player.Character:MoveTo(player.SpawnPos.Value.p)
+    wait(0.25)
+    game:GetService("ReplicatedStorage").Events.PlayerHiveCommand:FireServer("ToggleHoneyMaking")
+    repeat wait() 
+    if (player.Character.HumanoidRootPart.CFrame.Position-player.SpawnPos.Value.p).Magnitude > 7.5 then
+        player.Character:MoveTo(player.SpawnPos.Value.p)
+        wait(0.25)
+        game:GetService("ReplicatedStorage").Events.PlayerHiveCommand:FireServer("ToggleHoneyMaking")
+    end
+    until getPollen() < 1
+    wait(5.5)
+    player.Character.HumanoidRootPart.CFrame = prevPos
+    wait()
+    selling = false
+end
+
+local function autoSell()
+    if getPollen()+1 > getMaxPollen() and (not selling) and pollen then 
+        selling = true
+        sell()
+    end
+end
+
+--token stuff
+
+local maxSizeTokens = 50
+
+local inactiveTransparencyTokens = 0.7
+local inactiveBufferTokens = 0.05
+
+
+local function isActiveTokens(v)
+    return --[[v.DataCost ~= 32]] not ((v.Transparency + inactiveBufferTokens) > inactiveTransparencyTokens and (v.Transparency - inactiveBufferTokens) < inactiveTransparencyTokens)
+end
+local movingTokens = false
+local function moveToTokens()
+    if not movingTokens then
+    movingTokens = true
+    local plr = game:GetService("Players").LocalPlayer.Character
+    local plrpos = plr.HumanoidRootPart.CFrame
+    currp = plrpos
+    for _, v in pairs(game.Workspace.Collectibles:GetChildren()) do
+        if selling then repeat wait() until not selling end
+        if v.Parent ~= nil and v.FrontDecal then
+        if (v.CFrame.Position-plrpos.Position).Magnitude < maxSizeTokens and isActiveTokens(v)then
+            plr.HumanoidRootPart.CFrame = CFrame.new(v.CFrame.Position.x, v.CFrame.Position.y, v.CFrame.Position.z)
+            repeat 
+                plr.HumanoidRootPart.CFrame = CFrame.new(v.CFrame.Position.x, v.CFrame.Position.y, v.CFrame.Position.z)
+                wait()
+            until v.Orientation.Z > 1 or v.Parent == nil or selling
+        end
+        end
+    end
+    plr.HumanoidRootPart.CFrame = currp
+    movingTokens = false
+    end
+end
+
+local function collectTokens()
+if not movingTokens and tokens then
+moveToTokens()
+end
+end
+
+--autodig
+local function autoDig()
+    if dig then 
+        if game:GetService("Players").LocalPlayer.Character:FindFirstChildWhichIsA("Tool") and game:GetService("Players").LocalPlayer.Character:FindFirstChildWhichIsA("Tool"):FindFirstChild("ClickEvent") then
+            game:GetService("Players").LocalPlayer.Character:FindFirstChildWhichIsA("Tool"):FindFirstChild("ClickEvent"):FireServer()
+        end
+    end
+end
+
+--tp to highest field
+local beesToFieldName = {
+    [0] = "Clover Field",
+    [5] = "Spider Field",
+    [10] = "Pineapple Patch",
+    [15] = "Pumpkin Patch",
+    [25] = "Mountain Top Field",
+    [35] = "Pepper Patch"
+}
+
+local function thirtyFiveBeeZoneMax()
+    if workspace.MonsterSpawners.CoconutCrab.TimerAttachment.TimerGui.TimerLabel.Visible then
+        return "Coconut Field"
+    else
+        return "Pepper Patch"
+    end
+end
+
+local function tenBeeZoneMax()
+    if workspace.MonsterSpawners.StumpSnail.TimerAttachment.TimerGui.TimerLabel.Visible then
+        return "Stump Field"
+    else
+        return "Pineapple Patch"
+    end
+end
+
+local function beesToCFrame(bees)
+    local cframe = game:GetService("Players").LocalPlayer.Character.HumanoidRootPart.CFrame
+    local highest = 0
+    beesToFieldName[10] = tenBeeZoneMax()
+    beesToFieldName[35] = thirtyFiveBeeZoneMax()
+    for b, n in pairs(beesToFieldName) do
+        if bees >= b and b >= highest then
+            cframe = workspace.FlowerZones[n].CFrame
+            highest = b
+        end
+    end
+    return cframe + Vector3.new(0,3,0)
+end
+
+local function Tween(time,pos)
+    workspace.Gravity = 0
+    game:GetService("TweenService"):Create(game.Players.LocalPlayer.Character.HumanoidRootPart, TweenInfo.new(time, Enum.EasingStyle.Linear), {CFrame = pos}):Play() wait(time)
+    workspace.Gravity = 196.19999694824
+end
+
+local function tpToMaxField()
+    local bees = 0
+    for _, v in pairs(game.Players.LocalPlayer.Honeycomb.Value.Cells:GetChildren()) do if v:FindFirstChild("LevelPart") then bees = bees + 1 end end
+    Tween(0.5, beesToCFrame(bees))
+end
+
+local tpAvailable = true
+
+local function fieldTP()
+    if tpAvailable and field and not selling and not movingTokens then 
+        tpToMaxField()
+        tpAvailable = false
+        tpCounter = 0
+    end
+end
+
+local tpCounter = 0
+local tpDelay = 15
+
+local Loop = game:GetService("RunService").Heartbeat:Connect(function(step)
+    local off = false
+    off = (autooff and (not (#game.Players:GetPlayers() == 1)))
+    if not off then
+    autoSell()
+    autoDig()
+    if not selling then
+    collectTokens()
+    fieldTP()
+    end
+    end
+    tpCounter = tpCounter + step
+    if tpCounter > tpDelay then
+        tpCounter = tpCounter - tpDelay
+        tpAvailable = true
+    end
+    
+end)
+
+
+local PollenButton = main:Toggle('Auto-Convert Pollen', function(p)
+    pollen = p
+end, pollen)
+
+local TokenButton = main:Toggle('Auto-Collect Tokens', function(t)
+    tokens = t
+end, tokens)
+
+local DigButton = main:Toggle('Auto Dig', function(d)
+    dig = d
+end, dig)
+
+local FieldButton = main:Toggle('Farm best Field', function(f)
+    field = f
+end, field)
+
+local OffButton = main:Toggle('Deactivate on Player Join', function(o)
+    autooff = o
+end, autooff)
+
+local AFK = main:Toggle('Anti-Afk', function()
+local vu = game:GetService("VirtualUser")
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+   vu:Button2Down(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+   wait(1)
+   vu:Button2Up(Vector2.new(0,0),workspace.CurrentCamera.CFrame)
+end)
+wait(0.1)
+game.StarterGui:SetCore("SendNotification", {
+Title = "GrubHub";
+Text = "Anti-Afk on";
+Icon = "rbxassetid://1299491401";
+Duration = 5;
+})
+end)
+
+local Farm = main:Button('Open Main UI', function()	
+loadstring(game:HttpGet("https://raw.githubusercontent.com/StopReverseEngineeringMyScripts/WhatAreYouDoingHere/main/BeeSwarmGood.lua",true))()
+end)
+
+--[[local CloseButton = main:Button('Remove GUI', function()
+pollen = false
+tokens = false
+dig = false
+field = false
+autooff = true	
+main:Destroy()
+Loop:Disconnect()
+end)]]
